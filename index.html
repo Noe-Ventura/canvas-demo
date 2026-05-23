@@ -29,7 +29,7 @@
             <div>
                 <span class="text-xs font-bold uppercase tracking-wider text-red-600 bg-red-50 px-2 py-1 rounded">MICRO-315 | EPFL</span>
                 <h1 class="text-2xl font-extrabold text-slate-900 mt-1">Traitement d'Image Actif — Suivi de Cible</h1>
-                <p class="text-sm text-slate-500 mt-0.5">Outil interactif de calibration et d'analyse des signaux synchronisé avec camera.h</p>
+                <p class="text-sm text-slate-500 mt-0.5">Outil interactif de calibration et d'analyse des signaux synchronisé avec camera.h et camera.c</p>
             </div>
             <div class="flex flex-wrap gap-2">
                 <button id="btnPlay" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-sm font-semibold transition flex items-center gap-2">
@@ -70,9 +70,35 @@
 
                     <div class="text-slate-400">ACCEPT_FACTOR</div>
                     <div class="text-right text-emerald-400 font-bold">2</div>
-                    
-                    <div class="text-slate-400">TIMEOUT_CAM</div>
-                    <div class="text-right text-emerald-400 font-bold">100 ms</div>
+                </div>
+            </div>
+
+            <!-- Section d'Exécution en Temps Réel de l'arbre de décision C (camera.c) -->
+            <div class="bg-indigo-950 text-slate-100 rounded-xl p-4 text-xs space-y-3">
+                <p class="font-bold text-indigo-300 border-b border-indigo-800 pb-1.5 flex items-center gap-1.5">
+                    <i class="fa-solid fa-code-branch text-indigo-400"></i> Arbre de Décision Actif (camera.c)
+                </p>
+                <div class="space-y-2 font-mono text-[11px]">
+                    <!-- Standard -->
+                    <div id="branchStandard" class="flex justify-between items-center p-1.5 rounded border border-slate-800 bg-slate-950/40 opacity-40 transition-all">
+                        <span class="text-slate-300">1. Standard (Deux flancs vus)</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-emerald-600/20 text-emerald-400 font-bold">ACTIF</span>
+                    </div>
+                    <!-- Bordure Droite -->
+                    <div id="branchRight" class="flex justify-between items-center p-1.5 rounded border border-slate-800 bg-slate-950/40 opacity-40 transition-all">
+                        <span class="text-slate-300">2. Bordure Droite (Montant perdu)</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-600/20 text-amber-400 font-bold">ACTIF</span>
+                    </div>
+                    <!-- Bordure Gauche -->
+                    <div id="branchLeft" class="flex justify-between items-center p-1.5 rounded border border-slate-800 bg-slate-950/40 opacity-40 transition-all">
+                        <span class="text-slate-300">3. Bordure Gauche (Descendant perdu)</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-amber-600/20 text-amber-400 font-bold">ACTIF</span>
+                    </div>
+                    <!-- Inversion des bords -->
+                    <div id="branchInverted" class="flex justify-between items-center p-1.5 rounded border border-slate-800 bg-slate-950/40 opacity-40 transition-all">
+                        <span class="text-slate-300">4. Inversion (Ordre invalide)</span>
+                        <span class="px-1.5 py-0.5 rounded text-[10px] bg-red-600/20 text-red-400 font-bold">ACTIF</span>
+                    </div>
                 </div>
             </div>
 
@@ -87,7 +113,8 @@
                         <label class="text-slate-600">Position de la Cible (Index)</label>
                         <span id="valPos" class="text-indigo-600 font-bold">320 px</span>
                     </div>
-                    <input type="range" id="sliderPos" min="50" max="590" value="320" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
+                    <!-- Range étendu pour permettre de glisser complètement hors champ de vision (0-640) -->
+                    <input type="range" id="sliderPos" min="-100" max="740" value="320" class="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600">
                 </div>
 
                 <!-- Largeur Cible -->
@@ -184,7 +211,7 @@
                 <div class="flex justify-between items-center mb-1">
                     <span class="text-sm font-bold text-slate-900 flex items-center gap-2">
                         <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
-                        3. Dérivée Centrée & Fenêtres d'Intégration
+                        3. Dérivée Centrée & Fenêtres d'Intégration (exactes)
                     </span>
                     <div id="formulaDeriv" class="text-xs text-slate-500 font-mono"></div>
                 </div>
@@ -281,6 +308,12 @@
             const valSmooth = document.getElementById("valSmooth");
             const valArea = document.getElementById("valArea");
 
+            // Badges des branches d'exécution
+            const branchStandard = document.getElementById("branchStandard");
+            const branchRight = document.getElementById("branchRight");
+            const branchLeft = document.getElementById("branchLeft");
+            const branchInverted = document.getElementById("branchInverted");
+
             // Canvases
             const canvasRaw = document.getElementById("canvasRaw");
             const canvasSmooth = document.getElementById("canvasSmooth");
@@ -292,6 +325,9 @@
             let isPlaying = false;
             let currentSweepX = 0;
             let hoveredX = null;
+
+            // Persistance de la consigne (identique au comportement statique C : static uint16_t target_index = IMAGE_BUFFER_SIZE/2)
+            let lastValidTarget = size / 2;
 
             // Fonction pour synchroniser le hover sur l'ensemble des graphes
             function getMouseXOnCanvas(e, canvas) {
@@ -374,7 +410,7 @@
                 });
             });
 
-            // Génération des données mathématiques exactes (camera.c & camera.h)
+            // Génération des données mathématiques exactes et arbre de décision (camera.c & camera.h)
             function computeData() {
                 const N = size;
                 const pos = parseInt(sliderPos.value);
@@ -383,7 +419,6 @@
                 const wSmooth = parseInt(sliderSmooth.value);
                 const wArea = parseInt(sliderArea.value);
 
-                // exact matching calculation divisions from C source code
                 const halfSmooth = Math.floor(wSmooth / 2);
                 const halfArea = Math.floor(wArea / 2);
 
@@ -406,7 +441,6 @@
                 const smoothed = [];
                 for (let i = 0; i < N; i++) {
                     let sum = 0;
-                    // start_left / end_right calculation matching your exact logic:
                     let start = (i >= halfSmooth) ? i - halfSmooth : 0;
                     let end = (i + halfSmooth < N) ? i + halfSmooth : N - 1;
                     for (let j = start; j <= end; j++) {
@@ -432,7 +466,6 @@
 
                 for (let i = 0; i < N; i++) {
                     let sum = 0;
-                    // start_left / end_right for area integration
                     let start = (i > halfArea) ? i - halfArea : 0;
                     let end = (i < N - halfArea) ? i + halfArea : N - 1;
                     for (let j = start; j <= end; j++) {
@@ -440,26 +473,107 @@
                     }
                     areas.push(sum);
 
-                    // Falling edge is min area (strongest drop in intensity)
+                    // Falling edge (Min area -> Transition blanc vers noir)
                     if (sum < bestFallingVal) {
                         bestFallingVal = sum;
                         bestFallingIdx = i;
                     }
-                    // Rising edge is max area (strongest spike in intensity)
+                    // Rising edge (Max area -> Transition noir vers blanc)
                     if (sum > bestRisingVal) {
                         bestRisingVal = sum;
                         bestRisingIdx = i;
                     }
                 }
 
-                // Decision logic matching camera.c
-                const finalTarget = Math.round((bestFallingIdx + bestRisingIdx) / 2);
+                // --- LOGIQUE DE DÉCISION DE BORDURE ET SNR EXACTE DE CAMERA.C ---
+                
+                // Détection de présence (SNR)
+                let sum_abs_deriv = 0;
+                let max_abs_deriv = 0;
+                for(let i = 0; i < N; i++) {
+                    let abs_d = Math.abs(deriv[i]);
+                    sum_abs_deriv += abs_d;
+                    if(abs_d > max_abs_deriv) max_abs_deriv = abs_d;
+                }
+                let mean = sum_abs_deriv / N;
+                let snr = mean === 0 ? 0 : max_abs_deriv / mean;
+                let good_signal = (snr > 4.5); // SNR_THRESHOLD = 4.5f
+
+                // Traitement des flancs absolus pour l'Arbre de Décision
+                let falling_edge_abs = Math.abs(bestFallingVal);
+                let rising_edge_abs = Math.abs(bestRisingVal);
+                const ACCEPT_FACTOR = 2.0;
+
+                let activeBranch = "STANDARD";
+                let target_index = lastValidTarget;
+
+                if (!good_signal) {
+                    activeBranch = "LOST"; // signal trop bas
+                } 
+                // falling edge <-> right side (la cible sort par la droite de la caméra, on perd le rising edge à gauche)
+                else if (falling_edge_abs > ACCEPT_FACTOR * rising_edge_abs) {
+                    activeBranch = "RIGHT_BORDER";
+                    target_index = Math.round((bestFallingIdx + N) / 2);
+                } 
+                // left side <-> rising edge (la cible sort par la gauche de la caméra, on perd le falling edge à droite)
+                else if (rising_edge_abs > ACCEPT_FACTOR * falling_edge_abs) {
+                    activeBranch = "LEFT_BORDER";
+                    target_index = Math.round((0 + bestRisingIdx) / 2);
+                } 
+                // Inversion physique de l'ordre d'apparition
+                else if (bestRisingIdx < bestFallingIdx) {
+                    activeBranch = "INVERTED_ORDER";
+                    good_signal = false; // invalidation du signal
+                } 
+                // Cas standard (les deux flancs sont bien identifiés)
+                else {
+                    activeBranch = "STANDARD";
+                    target_index = Math.round((bestFallingIdx + bestRisingIdx) / 2);
+                }
+
+                // Sauvegarde d'état statique
+                if (good_signal && activeBranch !== "INVERTED_ORDER") {
+                    lastValidTarget = target_index;
+                }
 
                 return {
                     raw, smoothed, deriv, areas,
-                    bestFallingIdx, bestRisingIdx, finalTarget,
+                    bestFallingIdx, bestRisingIdx, finalTarget: target_index,
+                    good_signal, activeBranch, falling_edge_abs, rising_edge_abs,
                     wArea, halfArea, leftEdge, rightEdge
                 };
+            }
+
+            // Mettre à jour l'arbre de décision visuel dans le panneau de gauche
+            function updateDecisionUI(activeBranch, goodSignal) {
+                // reset all branch stylings
+                [branchStandard, branchRight, branchLeft, branchInverted].forEach(el => {
+                    el.classList.add("opacity-40");
+                    el.classList.remove("border-emerald-500", "border-amber-500", "border-red-500", "bg-emerald-950/50", "bg-amber-950/50", "bg-red-950/50");
+                });
+
+                if (!goodSignal && activeBranch !== "INVERTED_ORDER") {
+                    return; // Tout est éteint (Mode Lost)
+                }
+
+                switch (activeBranch) {
+                    case "STANDARD":
+                        branchStandard.classList.remove("opacity-40");
+                        branchStandard.classList.add("border-emerald-500", "bg-emerald-950/50");
+                        break;
+                    case "RIGHT_BORDER":
+                        branchRight.classList.remove("opacity-40");
+                        branchRight.classList.add("border-amber-500", "bg-amber-950/50");
+                        break;
+                    case "LEFT_BORDER":
+                        branchLeft.classList.remove("opacity-40");
+                        branchLeft.classList.add("border-amber-500", "bg-amber-950/50");
+                        break;
+                    case "INVERTED_ORDER":
+                        branchInverted.classList.remove("opacity-40");
+                        branchInverted.classList.add("border-red-500", "bg-red-950/50");
+                        break;
+                }
             }
 
             // Fonction de dessin d'un graphique sur canvas
@@ -467,7 +581,6 @@
                 const ctx = canvas.getContext('2d');
                 const ratio = window.devicePixelRatio || 1;
                 
-                // Correction cruciale : Calcul géométrique basé sur la taille logique (CSS) du canvas
                 const width = canvas.width / ratio;
                 const height = canvas.height / ratio;
 
@@ -564,7 +677,6 @@
                     canvas.height = rect.height * ratio;
                     const ctx = canvas.getContext('2d');
                     
-                    // Réinitialisation et application stricte de la matrice d'échelle
                     ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
                     
                     canvas.style.width = `${rect.width}px`;
@@ -572,6 +684,9 @@
                 });
 
                 const dataset = computeData();
+
+                // Mise à jour de l'UI indicateur d'arbre de décision
+                updateDecisionUI(dataset.activeBranch, dataset.good_signal);
 
                 // 1. SIGNAL BRUT
                 drawGraph(canvasRaw, dataset.raw, "#64748b", 'line', {
@@ -621,11 +736,29 @@
                             ctx.fillText(label, pxStart + 4, 18);
                         };
 
-                        // 1. Zone du flanc montant (Rising Edge - Vert)
-                        drawIntegrationWindow(dataset.bestRisingIdx, "rgba(16, 185, 129, 0.12)", "Flanc Montant (Max)");
+                        // 1. Zone du flanc montant (Rising Edge - Vert) - Uniquement si visible
+                        if (dataset.activeBranch !== "RIGHT_BORDER") {
+                            drawIntegrationWindow(dataset.bestRisingIdx, "rgba(16, 185, 129, 0.12)", "Flanc Montant (Max)");
+                        } else {
+                            // Hachures pour montrer la perte du flanc montant à droite
+                            ctx.fillStyle = "rgba(239, 68, 68, 0.05)";
+                            ctx.fillRect(mapX(550), 0, mapX(640)-mapX(550), h);
+                            ctx.fillStyle = "#ef4444";
+                            ctx.font = "italic bold 9px 'Inter', sans-serif";
+                            ctx.fillText("Flanc montant PERDU (Hors cadre)", mapX(430), h - 15);
+                        }
 
-                        // 2. Zone du flanc descendant (Falling Edge - Rouge)
-                        drawIntegrationWindow(dataset.bestFallingIdx, "rgba(239, 68, 68, 0.12)", "Flanc Descendant (Min)");
+                        // 2. Zone du flanc descendant (Falling Edge - Rouge) - Uniquement si visible
+                        if (dataset.activeBranch !== "LEFT_BORDER") {
+                            drawIntegrationWindow(dataset.bestFallingIdx, "rgba(239, 68, 68, 0.12)", "Flanc Descendant (Min)");
+                        } else {
+                            // Hachures pour montrer la perte du flanc descendant à gauche
+                            ctx.fillStyle = "rgba(239, 68, 68, 0.05)";
+                            ctx.fillRect(0, 0, mapX(90), h);
+                            ctx.fillStyle = "#ef4444";
+                            ctx.font = "italic bold 9px 'Inter', sans-serif";
+                            ctx.fillText("Flanc descendant PERDU (Hors cadre)", mapX(15), h - 15);
+                        }
 
                         // Affichage dynamique de la fenêtre pour le curseur actif
                         const activeX = hoveredX !== null ? hoveredX : (isPlaying ? currentSweepX : null);
@@ -645,21 +778,53 @@
                 drawGraph(canvasArea, dataset.areas, "#4f46e5", 'line', {
                     min: -600, max: 600,
                     onDraw: (ctx, mapX, mapY, w, h) => {
-                        // Afficher le point minimal (Falling edge)
-                        const pMinX = mapX(dataset.bestFallingIdx);
-                        const pMinY = mapY(dataset.areas[dataset.bestFallingIdx]);
-                        ctx.fillStyle = "#ef4444";
-                        ctx.beginPath();
-                        ctx.arc(pMinX, pMinY, 5, 0, Math.PI * 2);
-                        ctx.fill();
+                        // Point minimal (Falling edge) - si on ne l'a pas perdu
+                        if (dataset.activeBranch !== "LEFT_BORDER") {
+                            const pMinX = mapX(dataset.bestFallingIdx);
+                            const pMinY = mapY(dataset.areas[dataset.bestFallingIdx]);
+                            ctx.fillStyle = "#ef4444";
+                            ctx.beginPath();
+                            ctx.arc(pMinX, pMinY, 5, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
 
-                        // Afficher le point maximal (Rising edge)
-                        const pMaxX = mapX(dataset.bestRisingIdx);
-                        const pMaxY = mapY(dataset.areas[dataset.bestRisingIdx]);
-                        ctx.fillStyle = "#10b981";
-                        ctx.beginPath();
-                        ctx.arc(pMaxX, pMaxY, 5, 0, Math.PI * 2);
-                        ctx.fill();
+                        // Point maximal (Rising edge) - si on ne l'a pas perdu
+                        if (dataset.activeBranch !== "RIGHT_BORDER") {
+                            const pMaxX = mapX(dataset.bestRisingIdx);
+                            const pMaxY = mapY(dataset.areas[dataset.bestRisingIdx]);
+                            ctx.fillStyle = "#10b981";
+                            ctx.beginPath();
+                            ctx.arc(pMaxX, pMaxY, 5, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+
+                        // Dessin des repères d'estimation de bordure (0 ou 640)
+                        if (dataset.activeBranch === "RIGHT_BORDER") {
+                            ctx.strokeStyle = "rgba(239, 68, 68, 0.5)";
+                            ctx.lineWidth = 1.5;
+                            ctx.setLineDash([3, 3]);
+                            ctx.beginPath();
+                            ctx.moveTo(mapX(640), 0); ctx.lineTo(mapX(640), h);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+                            
+                            // Petite flèche ou texte de rappel
+                            ctx.fillStyle = "#d97706";
+                            ctx.font = "bold 9px 'Inter', sans-serif";
+                            ctx.fillText("Flanc montant supposé à 640 px", mapX(400), h/4);
+                        } else if (dataset.activeBranch === "LEFT_BORDER") {
+                            ctx.strokeStyle = "rgba(239, 68, 68, 0.5)";
+                            ctx.lineWidth = 1.5;
+                            ctx.setLineDash([3, 3]);
+                            ctx.beginPath();
+                            ctx.moveTo(mapX(0), 0); ctx.lineTo(mapX(0), h);
+                            ctx.stroke();
+                            ctx.setLineDash([]);
+
+                            ctx.fillStyle = "#d97706";
+                            ctx.font = "bold 9px 'Inter', sans-serif";
+                            ctx.fillText("Flanc descendant supposé à 0 px", mapX(15), h/4);
+                        }
 
                         // Ligne verticale au centre final déterminé par odométrie logicielle
                         const tarX = mapX(dataset.finalTarget);
