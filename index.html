@@ -42,12 +42,12 @@
                 <span class="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
                     <i class="fa-solid fa-magnifying-glass text-xs"></i>
                 </span>
-                <input type="text" id="search-input" placeholder="Rechercher un outil, une techno ou un cours..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all">
+                <input type="text" id="search-input" placeholder="Rechercher un outil, une techno ou un cours..." class="w-full pl-9 pr-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm">
             </div>
 
             <!-- Filtre par catégorie -->
             <div class="sm:w-64">
-                <select id="category-filter" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm cursor-pointer transition-all">
+                <select id="category-filter" class="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 text-sm cursor-pointer">
                     <option value="all">Toutes les catégories</option>
                     <!-- Les options de catégories seront injectées ici -->
                 </select>
@@ -90,6 +90,15 @@
                 icon: "fa-solid fa-eye",
                 tags: ["Robotique", "Vision", "EPFL"],
                 date: "Mai 2026"
+            },
+            {
+                title: "Bell Crank Kinematic Simulator",
+                category: "VENTURA - Mechanical Design",
+                description: "Simulateur interactif 2D pour modéliser les mécanismes de transmission non-linéaires. Explorez l'avantage mécanique instantané et les enveloppes de mouvement d'un système à crank-slider avec deux bras mobiles.",
+                path: "./VENTURA/GUIDAGE_FLEX_MODELS/Bell_crank_idea/index.html",
+                icon: "fa-solid fa-cogs",
+                tags: ["Cinématique", "Mécanique", "Canvas", "Simulation"],
+                date: "Juin 2026"
             }
         ];
 
@@ -154,7 +163,7 @@
                         <div class="flex flex-wrap gap-1 mb-4">
                             ${tagsHtml}
                         </div>
-                        <a href="${project.path}" class="w-full inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white font-medium text-xs rounded transition-colors duration-100">
+                        <a href="${project.path}" class="w-full inline-flex items-center justify-center space-x-1.5 px-3 py-1.5 bg-slate-100 hover:bg-blue-600 text-slate-700 hover:text-white font-medium text-xs rounded transition-colors">
                             <span>Ouvrir l'outil</span>
                             <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                         </a>
