@@ -1,0 +1,975 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Bell Crank Kinematic Simulator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .mono-font {
+            font-family: 'JetBrains Mono', monospace;
+        }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col overflow-x-hidden">
+
+    <!-- Header -->
+    <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur px-6 py-4 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <div class="p-2 bg-indigo-600 rounded-lg text-white">
+                <!-- Mechanical Icon -->
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight text-white">Bell Crank Kinematic Simulator</h1>
+                <p class="text-xs text-slate-400">Model non-linear transmission & geometric mechanical advantage</p>
+            </div>
+        </div>
+        
+        <!-- Presets -->
+        <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400 font-medium">Presets:</span>
+            <button onclick="loadPreset('standard')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 font-medium transition">Standard 90°</button>
+            <button onclick="loadPreset('differential')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 font-medium transition">Amplifier (2:1)</button>
+            <button onclick="loadPreset('obtuse')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 font-medium transition">Obtuse (120°)</button>
+            <button onclick="loadPreset('acute')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-xs rounded border border-slate-700 font-medium transition">Acute (60°)</button>
+        </div>
+    </header>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 max-w-[1600px] w-full mx-auto">
+        
+        <!-- Viewport & Plot (Left Side) -->
+        <div class="lg:col-span-7 flex flex-col gap-6">
+            
+            <!-- Interactive Canvas -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden relative shadow-lg flex-1 min-h-[500px]">
+                <div class="absolute top-4 left-4 bg-slate-950/80 backdrop-blur px-3 py-1.5 rounded-lg border border-slate-850 text-xs font-semibold tracking-wider text-slate-300 flex items-center gap-2">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Interactive Kinematic Workspace
+                </div>
+                
+                <!-- Overlay Legend/Controls -->
+                <div class="absolute top-4 right-4 flex gap-2">
+                    <button id="btnPlay" class="p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition shadow-md flex items-center gap-1 text-xs">
+                        <svg id="playIcon" class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"/></svg>
+                        <svg id="pauseIcon" class="w-4 h-4 hidden" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zM7 8a1 1 0 012 0v4a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v4a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd"/></svg>
+                        <span id="playText">Auto Sweep</span>
+                    </button>
+                    <button id="btnReset" class="p-2 bg-slate-800 hover:bg-slate-750 text-slate-300 rounded-lg transition border border-slate-700" title="Reset View & Parameters">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.27 15C20.25 15.65 19 16 17.5 16s-3-1.5-3.5-3"/></svg>
+                    </button>
+                </div>
+
+                <canvas id="kinematicCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+
+                <!-- Status/Warnings -->
+                <div id="assemblyWarning" class="absolute bottom-4 left-4 bg-rose-950/90 border border-rose-800 text-rose-200 px-4 py-2.5 rounded-lg text-xs font-medium max-w-[280px] shadow-lg hidden">
+                    ⚠️ Assembly Limit Exceeded! The current crank rotation cannot be satisfied by the configured pushrod lengths.
+                </div>
+            </div>
+
+            <!-- Live Metrics Board -->
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-md">
+                    <span class="text-xs text-slate-400 font-medium">Crank Rotation (&alpha;)</span>
+                    <div id="valAlphaDeg" class="text-xl font-bold text-white tracking-tight mt-1 mono-font">0.00°</div>
+                    <div id="valAlphaRad" class="text-xs text-indigo-400 mt-0.5 mono-font">0.000 rad</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-md">
+                    <span class="text-xs text-slate-400 font-medium">Input Actuator (X_in)</span>
+                    <div id="valXin" class="text-xl font-bold text-white tracking-tight mt-1 mono-font">0.00 u</div>
+                    <div class="text-xs text-emerald-400 mt-0.5 font-medium">Horizontal Slider</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-md">
+                    <span class="text-xs text-slate-400 font-medium">Output Slider (Y_out)</span>
+                    <div id="valYout" class="text-xl font-bold text-white tracking-tight mt-1 mono-font">0.00 u</div>
+                    <div class="text-xs text-sky-400 mt-0.5 font-medium">Vertical Slider</div>
+                </div>
+                <div class="bg-slate-900 border border-slate-800 p-4 rounded-xl shadow-md">
+                    <div class="flex items-center gap-1">
+                        <span class="text-xs text-slate-400 font-medium">Mechanical Advantage</span>
+                        <div class="group relative">
+                            <span class="cursor-help text-[10px] bg-slate-800 px-1.5 rounded-full text-slate-400">?</span>
+                            <span class="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-slate-950 border border-slate-800 text-[10px] text-slate-300 p-2 rounded shadow-xl opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                Velocity transmission scale ratio |dY_out / dX_in|. A value of 1.0 means symmetric speed transfer.
+                            </span>
+                        </div>
+                    </div>
+                    <div id="valMA" class="text-xl font-bold text-amber-400 tracking-tight mt-1 mono-font">1.000</div>
+                    <div class="text-xs text-amber-500/80 mt-0.5 font-medium">Instantaneous Ratio</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Configurations & Plot (Right Side) -->
+        <div class="lg:col-span-5 flex flex-col gap-6">
+            
+            <!-- Real-time Plot Card -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-semibold tracking-wide text-slate-200">Transmission Profile (X_in vs Y_out)</h3>
+                    <span class="text-[10px] bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 px-2 py-0.5 rounded font-mono">Live Transfer Graph</span>
+                </div>
+                <div class="bg-slate-950 border border-slate-850 rounded-lg p-3 relative h-56 flex items-center justify-center">
+                    <canvas id="plotCanvas" class="w-full h-full block"></canvas>
+                </div>
+                <p class="text-[11px] text-slate-400 mt-2.5 leading-relaxed">
+                    The curved yellow line highlights the <strong class="text-indigo-300">non-linear kinematics</strong> relative to a pure linear mechanism (dashed blue line).
+                </p>
+            </div>
+
+            <!-- Parameters Panel -->
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-lg flex-1">
+                <h3 class="text-sm font-semibold tracking-wide text-slate-200 mb-4 pb-3 border-b border-slate-850">Mechanism Parameter Board</h3>
+                
+                <div class="space-y-5">
+                    
+                    <!-- Dynamic Angle Control Slider -->
+                    <div class="p-3 bg-indigo-950/30 border border-indigo-900/20 rounded-lg">
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="font-medium text-indigo-300 flex items-center gap-1">
+                                <span class="w-1.5 h-1.5 bg-indigo-400 rounded-full"></span>
+                                Angle Slider (&alpha;)
+                            </span>
+                            <span id="sliderAlphaLabel" class="mono-font text-indigo-200 font-semibold">0.00 rad</span>
+                        </div>
+                        <input id="sliderAlpha" type="range" min="-0.8" max="0.8" step="0.005" value="0" class="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                    </div>
+
+                    <!-- Arm Dimensions R1 / R2 -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-400">Input Arm (R₁)</span>
+                                <span id="lblR1" class="mono-font text-slate-300">3.0</span>
+                            </div>
+                            <input id="slideR1" type="range" min="1.5" max="5.0" step="0.1" value="3.0" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-400">Output Arm (R₂)</span>
+                                <span id="lblR2" class="mono-font text-slate-300">3.0</span>
+                            </div>
+                            <input id="slideR2" type="range" min="1.5" max="5.0" step="0.1" value="3.0" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- Structural Properties (Gamma / Theta0) -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-400">Crank Angle (&gamma;)</span>
+                                <span id="lblGamma" class="mono-font text-slate-300">90°</span>
+                            </div>
+                            <input id="slideGamma" type="range" min="30" max="150" step="1" value="90" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-400">Initial Angle (&theta;₀)</span>
+                                <span id="lblTheta0" class="mono-font text-slate-300">180°</span>
+                            </div>
+                            <input id="slideTheta0" type="range" min="0" max="360" step="5" value="180" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- Pushrods Linkage Lengths L1 / L2 -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-400">Input Rod (L₁)</span>
+                                <span id="lblL1" class="mono-font text-slate-300">4.5</span>
+                            </div>
+                            <input id="slideL1" type="range" min="2.0" max="8.0" step="0.1" value="4.5" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-400">Output Rod (L₂)</span>
+                                <span id="lblL2" class="mono-font text-slate-300">4.5</span>
+                            </div>
+                            <input id="slideL2" type="range" min="2.0" max="8.0" step="0.1" value="4.5" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- Slide Lines Offsets -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-400">In Slider Height (y_in)</span>
+                                <span id="lblyIn" class="mono-font text-slate-300">1.0</span>
+                            </div>
+                            <input id="slideYIn" type="range" min="-3.0" max="3.0" step="0.1" value="1.0" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="text-slate-400">Out Slider Align (x_out)</span>
+                                <span id="lblxOut" class="mono-font text-slate-300">1.0</span>
+                            </div>
+                            <input id="slideXOut" type="range" min="-3.0" max="3.0" step="0.1" value="1.0" class="w-full h-1 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- Extra Overlay Visual Checks -->
+                    <div class="border-t border-slate-850 pt-3 flex flex-wrap gap-x-4 gap-y-2 justify-between">
+                        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-400">
+                            <input id="chkShowVectors" type="checkbox" checked class="rounded border-slate-700 bg-slate-800 text-indigo-500 focus:ring-0 focus:ring-offset-0">
+                            <span>Draw Velocity Vectors</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer text-xs text-slate-400">
+                            <input id="chkShowPaths" type="checkbox" checked class="rounded border-slate-700 bg-slate-800 text-indigo-500 focus:ring-0 focus:ring-offset-0">
+                            <span>Draw Motion Envelopes</span>
+                        </label>
+                    </div>
+
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- Interactive JS Script -->
+    <script>
+        // System variables & dynamic objects
+        const kCanvas = document.getElementById('kinematicCanvas');
+        const kCtx = kCanvas.getContext('2d');
+        const pCanvas = document.getElementById('plotCanvas');
+        const pCtx = pCanvas.getContext('2d');
+
+        // Parameter set
+        const params = {
+            xc: 0.0,
+            yc: 0.0,
+            R1: 3.0,
+            R2: 3.0,
+            gamma: Math.PI / 2, // 90 deg
+            theta0: Math.PI,    // 180 deg
+            alpha: 0.0,
+            L1: 4.5,
+            L2: 4.5,
+            y_in_line: 1.0,
+            x_out_line: 1.0
+        };
+
+        // Animation State
+        let isPlaying = false;
+        let animationTime = 0;
+        let dragMode = null; // 'alpha', 'actuator', 'pinP1', 'pinP2', 'sliderY'
+
+        // Constants and sizing
+        const originX = 260; // offset inside primary canvas
+        const originY = 270;
+        const mainScale = 45; // 45 pixels per mathematical unit
+
+        // Helper coordinate projection
+        function toCanvas(x, y) {
+            return {
+                x: originX + x * mainScale,
+                y: originY - y * mainScale // invert y for math coordinate system
+            };
+        }
+
+        function toLogical(cx, cy) {
+            return {
+                x: (cx - originX) / mainScale,
+                y: (originY - cy) / mainScale
+            };
+        }
+
+        // Initialize elements values on load
+        function syncUI() {
+            document.getElementById('sliderAlpha').value = params.alpha;
+            document.getElementById('sliderAlphaLabel').innerText = params.alpha.toFixed(3) + " rad";
+            document.getElementById('slideR1').value = params.R1;
+            document.getElementById('lblR1').innerText = params.R1.toFixed(1);
+            document.getElementById('slideR2').value = params.R2;
+            document.getElementById('lblR2').innerText = params.R2.toFixed(1);
+            document.getElementById('slideL1').value = params.L1;
+            document.getElementById('lblL1').innerText = params.L1.toFixed(1);
+            document.getElementById('slideL2').value = params.L2;
+            document.getElementById('lblL2').innerText = params.L2.toFixed(1);
+            document.getElementById('slideYIn').value = params.y_in_line;
+            document.getElementById('lblyIn').innerText = params.y_in_line.toFixed(1);
+            document.getElementById('slideXOut').value = params.x_out_line;
+            document.getElementById('lblxOut').innerText = params.x_out_line.toFixed(1);
+
+            document.getElementById('slideGamma').value = Math.round(params.gamma * 180 / Math.PI);
+            document.getElementById('lblGamma').innerText = Math.round(params.gamma * 180 / Math.PI) + "°";
+            document.getElementById('slideTheta0').value = Math.round(params.theta0 * 180 / Math.PI);
+            document.getElementById('lblTheta0').innerText = Math.round(params.theta0 * 180 / Math.PI) + "°";
+        }
+
+        // Exact kinematic formulas solver
+        function solveMechanism(alpha, overrideParams = null) {
+            const p = overrideParams || params;
+            
+            // Step 1: Pin P1 & P2
+            const p1x = p.xc + p.R1 * Math.cos(p.theta0 + alpha);
+            const p1y = p.yc + p.R1 * Math.sin(p.theta0 + alpha);
+
+            const p2x = p.xc + p.R2 * Math.cos(p.theta0 + p.gamma + alpha);
+            const p2y = p.yc + p.R2 * Math.sin(p.theta0 + p.gamma + alpha);
+
+            // Step 2: Actuator X_in (Formula A)
+            // L1^2 - (y_in_line - y_P1)^2 must be >= 0
+            const l1_term = p.L1 * p.L1 - Math.pow(p.y_in_line - p1y, 2);
+            const validL1 = l1_term >= 0;
+            // Pushing the rod leftwards
+            const x_in = validL1 ? (p1x - Math.sqrt(l1_term)) : null;
+
+            // Step 3: Slider Y_out (Formula B)
+            // L2^2 - (x_out_line - x_P2)^2 must be >= 0
+            const l2_term = p.L2 * p.L2 - Math.pow(p.x_out_line - p2x, 2);
+            const validL2 = l2_term >= 0;
+            const y_out = validL2 ? (p2y + Math.sqrt(l2_term)) : null;
+
+            return {
+                p1: { x: p1x, y: p1y },
+                p2: { x: p2x, y: p2y },
+                x_in,
+                y_out,
+                valid: validL1 && validL2 && x_in !== null && y_out !== null
+            };
+        }
+
+        // Live solver for dragging the input actuator directly (Circle-Circle intersection)
+        function solveAlphaFromActuatorX(targetX) {
+            const r1 = params.R1;
+            const r2 = params.L1; // actuator link rod
+            const ax = targetX;
+            const ay = params.y_in_line;
+
+            // distance from center C (0,0) to actuator (ax, ay)
+            const d = Math.sqrt(ax*ax + ay*ay);
+            if (d > r1 + r2 || d < Math.abs(r1 - r2)) return null; // Unreachable position
+
+            // Standard Circle-Circle intersection
+            const a = (r1*r1 - r2*r2 + d*d) / (2 * d);
+            const h = Math.sqrt(Math.max(0, r1*r1 - a*a));
+
+            // Midpoint
+            const mx = a * ax / d;
+            const my = a * ay / d;
+
+            // Two candidate intersection pins for P1
+            const p1a_x = mx + h * (ay / d);
+            const p1a_y = my - h * (ax / d);
+
+            const p1b_x = mx - h * (ay / d);
+            const p1b_y = my + h * (ax / d);
+
+            // Compute potential alphas
+            const alphaA = Math.atan2(p1a_y, p1a_x) - params.theta0;
+            const alphaB = Math.atan2(p1b_y, p1b_x) - params.theta0;
+
+            // Normalize and return the one closest to current alpha to preserve system state
+            const normA = Math.atan2(Math.sin(alphaA), Math.cos(alphaA));
+            const normB = Math.atan2(Math.sin(alphaB), Math.cos(alphaB));
+
+            return Math.abs(normA - params.alpha) < Math.abs(normB - params.alpha) ? normA : normB;
+        }
+
+        // Calculate continuous mechanical advantage numerically
+        function getMechanicalAdvantage(currentAlpha) {
+            const h = 0.001; // tiny delta
+            const sol1 = solveMechanism(currentAlpha - h);
+            const sol2 = solveMechanism(currentAlpha + h);
+            if (!sol1.valid || !sol2.valid) return 1.0;
+            
+            const dx = sol2.x_in - sol1.x_in;
+            const dy = sol2.y_out - sol1.y_out;
+            if (Math.abs(dx) < 1e-5) return 0;
+            return Math.abs(dy / dx);
+        }
+
+        // Preload Presets
+        window.loadPreset = function(presetName) {
+            if (presetName === 'standard') {
+                params.R1 = 3.0;
+                params.R2 = 3.0;
+                params.gamma = Math.PI / 2; // 90°
+                params.theta0 = Math.PI;    // 180°
+                params.L1 = 4.5;
+                params.L2 = 4.5;
+                params.y_in_line = 1.0;
+                params.x_out_line = 1.0;
+            } else if (presetName === 'differential') {
+                params.R1 = 2.0;
+                params.R2 = 4.0;
+                params.gamma = Math.PI / 2;
+                params.theta0 = Math.PI;
+                params.L1 = 4.5;
+                params.L2 = 4.8;
+                params.y_in_line = 1.0;
+                params.x_out_line = 1.0;
+            } else if (presetName === 'obtuse') {
+                params.R1 = 3.0;
+                params.R2 = 3.0;
+                params.gamma = (120 * Math.PI) / 180;
+                params.theta0 = Math.PI;
+                params.L1 = 4.5;
+                params.L2 = 4.5;
+                params.y_in_line = 1.2;
+                params.x_out_line = 1.2;
+            } else if (presetName === 'acute') {
+                params.R1 = 3.0;
+                params.R2 = 3.0;
+                params.gamma = (60 * Math.PI) / 180;
+                params.theta0 = Math.PI;
+                params.L1 = 4.5;
+                params.L2 = 4.5;
+                params.y_in_line = 0.8;
+                params.x_out_line = 0.8;
+            }
+            params.alpha = 0.0;
+            syncUI();
+            update();
+        };
+
+        // Resize handler
+        function resize() {
+            const parent = kCanvas.parentElement;
+            kCanvas.width = parent.clientWidth;
+            kCanvas.height = parent.clientHeight;
+            
+            pCanvas.width = pCanvas.parentElement.clientWidth;
+            pCanvas.height = pCanvas.parentElement.clientHeight;
+        }
+        window.addEventListener('resize', resize);
+
+        // Input Listeners
+        document.getElementById('sliderAlpha').addEventListener('input', (e) => {
+            params.alpha = parseFloat(e.target.value);
+            syncUI();
+            update();
+        });
+
+        const slideIds = ['slideR1', 'slideR2', 'slideL1', 'slideL2', 'slideYIn', 'slideXOut'];
+        slideIds.forEach(id => {
+            document.getElementById(id).addEventListener('input', (e) => {
+                const val = parseFloat(e.target.value);
+                if (id === 'slideR1') params.R1 = val;
+                if (id === 'slideR2') params.R2 = val;
+                if (id === 'slideL1') params.L1 = val;
+                if (id === 'slideL2') params.L2 = val;
+                if (id === 'slideYIn') params.y_in_line = val;
+                if (id === 'slideXOut') params.x_out_line = val;
+                syncUI();
+                update();
+            });
+        });
+
+        document.getElementById('slideGamma').addEventListener('input', (e) => {
+            params.gamma = parseFloat(e.target.value) * Math.PI / 180;
+            syncUI();
+            update();
+        });
+        document.getElementById('slideTheta0').addEventListener('input', (e) => {
+            params.theta0 = parseFloat(e.target.value) * Math.PI / 180;
+            syncUI();
+            update();
+        });
+
+        // Play/Pause auto sweep animation
+        const btnPlay = document.getElementById('btnPlay');
+        const playIcon = document.getElementById('playIcon');
+        const pauseIcon = document.getElementById('pauseIcon');
+        const playText = document.getElementById('playText');
+
+        btnPlay.addEventListener('click', () => {
+            isPlaying = !isPlaying;
+            if (isPlaying) {
+                playIcon.classList.add('hidden');
+                pauseIcon.classList.remove('hidden');
+                playText.innerText = "Pause Oscillation";
+            } else {
+                playIcon.classList.remove('hidden');
+                pauseIcon.classList.add('hidden');
+                playText.innerText = "Auto Sweep";
+            }
+        });
+
+        document.getElementById('btnReset').addEventListener('click', () => {
+            loadPreset('standard');
+        });
+
+        // Mouse/Touch Drag Setup
+        function getMousePos(canvas, e) {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+
+        function handleDragStart(e) {
+            const pos = getMousePos(kCanvas, e);
+            const logical = toLogical(pos.x, pos.y);
+            const sol = solveMechanism(params.alpha);
+
+            // Compute distances to interactive points
+            const distActuator = Math.hypot(logical.x - sol.x_in, logical.y - params.y_in_line);
+            const distP1 = Math.hypot(logical.x - sol.p1.x, logical.y - sol.p1.y);
+            const distP2 = Math.hypot(logical.x - sol.p2.x, logical.y - sol.p2.y);
+            const distSliderY = Math.hypot(logical.x - params.x_out_line, logical.y - sol.y_out);
+
+            const selectionThreshold = 0.4; // logical units distance tolerance
+
+            if (distActuator < selectionThreshold) {
+                dragMode = 'actuator';
+                e.preventDefault();
+            } else if (distP1 < selectionThreshold || distP2 < selectionThreshold) {
+                dragMode = 'rotation';
+                e.preventDefault();
+            } else if (distSliderY < selectionThreshold) {
+                dragMode = 'sliderY';
+                e.preventDefault();
+            }
+        }
+
+        function handleDragMove(e) {
+            if (!dragMode) return;
+            const pos = getMousePos(kCanvas, e);
+            const logical = toLogical(pos.x, pos.y);
+
+            if (dragMode === 'actuator') {
+                const requestedAlpha = solveAlphaFromActuatorX(logical.x);
+                if (requestedAlpha !== null && !isNaN(requestedAlpha)) {
+                    params.alpha = requestedAlpha;
+                }
+            } else if (dragMode === 'rotation') {
+                // Direct rotation dragging of pins relative to origin C(0,0)
+                let dragAngle = Math.atan2(logical.y, logical.x) - params.theta0;
+                params.alpha = Math.atan2(Math.sin(dragAngle), Math.cos(dragAngle)); // Wrap inside -PI to PI
+            } else if (dragMode === 'sliderY') {
+                // Solve inverse kinematics backwards from Y_out using a numerical target solver
+                let bestAlpha = params.alpha;
+                let minErr = Infinity;
+                // Search around current state for the cleanest match
+                for (let test = -0.8; test <= 0.8; test += 0.01) {
+                    const sol = solveMechanism(test);
+                    if (sol.valid) {
+                        const err = Math.abs(sol.y_out - logical.y);
+                        if (err < minErr) {
+                            minErr = err;
+                            bestAlpha = test;
+                        }
+                    }
+                }
+                params.alpha = bestAlpha;
+            }
+
+            // Keep bounds checked nicely
+            params.alpha = Math.max(-0.8, Math.min(0.8, params.alpha));
+            syncUI();
+            update();
+        }
+
+        function handleDragEnd() {
+            dragMode = null;
+        }
+
+        kCanvas.addEventListener('mousedown', handleDragStart);
+        kCanvas.addEventListener('mousemove', handleDragMove);
+        window.addEventListener('mouseup', handleDragEnd);
+
+        kCanvas.addEventListener('touchstart', handleDragStart, { passive: false });
+        kCanvas.addEventListener('touchmove', handleDragMove, { passive: false });
+        window.addEventListener('touchend', handleDragEnd);
+
+
+        // Animation Loop & Renderers
+        function update() {
+            kCtx.clearRect(0, 0, kCanvas.width, kCanvas.height);
+            pCtx.clearRect(0, 0, pCanvas.width, pCanvas.height);
+
+            const sol = solveMechanism(params.alpha);
+            
+            // Warnings
+            const warningEl = document.getElementById('assemblyWarning');
+            if (!sol.valid) {
+                warningEl.classList.remove('hidden');
+            } else {
+                warningEl.classList.add('hidden');
+            }
+
+            // Display numerical readouts
+            if (sol.valid) {
+                document.getElementById('valAlphaDeg').innerText = (params.alpha * 180 / Math.PI).toFixed(2) + "°";
+                document.getElementById('valAlphaRad').innerText = params.alpha.toFixed(3) + " rad";
+                document.getElementById('valXin').innerText = sol.x_in.toFixed(2) + " u";
+                document.getElementById('valYout').innerText = sol.y_out.toFixed(2) + " u";
+                document.getElementById('valMA').innerText = getMechanicalAdvantage(params.alpha).toFixed(3);
+            }
+
+            drawMechanism(sol);
+            drawPlot(sol);
+        }
+
+        function drawMechanism(sol) {
+            // Draw Coordinate Grid
+            kCtx.strokeStyle = '#1e293b';
+            kCtx.lineWidth = 1;
+            const gridSpacing = 1 * mainScale;
+            
+            // Horizontal grid
+            for (let y = -5; y <= 5; y++) {
+                const pt1 = toCanvas(-8, y);
+                const pt2 = toCanvas(8, y);
+                kCtx.beginPath();
+                kCtx.moveTo(pt1.x, pt1.y);
+                kCtx.lineTo(pt2.x, pt2.y);
+                kCtx.stroke();
+            }
+            // Vertical grid
+            for (let x = -8; x <= 8; x++) {
+                const pt1 = toCanvas(x, -5);
+                const pt2 = toCanvas(x, 5);
+                kCtx.beginPath();
+                kCtx.moveTo(pt1.x, pt1.y);
+                kCtx.lineTo(pt2.x, pt2.y);
+                kCtx.stroke();
+            }
+
+            const cCanvas = toCanvas(params.xc, params.yc);
+
+            // Draw Slider Guide Lines
+            // Input guide
+            kCtx.strokeStyle = 'rgba(16, 185, 129, 0.15)';
+            kCtx.lineWidth = 10;
+            kCtx.lineCap = 'round';
+            kCtx.beginPath();
+            const inL1 = toCanvas(-8, params.y_in_line);
+            const inL2 = toCanvas(2, params.y_in_line);
+            kCtx.moveTo(inL1.x, inL1.y);
+            kCtx.lineTo(inL2.x, inL2.y);
+            kCtx.stroke();
+
+            // Output guide
+            kCtx.strokeStyle = 'rgba(56, 189, 248, 0.15)';
+            kCtx.lineWidth = 10;
+            kCtx.beginPath();
+            const outL1 = toCanvas(params.x_out_line, -2);
+            const outL2 = toCanvas(params.x_out_line, 6);
+            kCtx.moveTo(outL1.x, outL1.y);
+            kCtx.lineTo(outL2.x, outL2.y);
+            kCtx.stroke();
+
+            // Label Guides
+            kCtx.fillStyle = '#64748b';
+            kCtx.font = '10px JetBrains Mono';
+            kCtx.fillText(`y = ${params.y_in_line.toFixed(1)} (Input Line)`, inL1.x + 10, inL1.y - 10);
+            kCtx.fillText(`x = ${params.x_out_line.toFixed(1)} (Output Line)`, outL2.x + 10, outL2.y + 15);
+
+            // Optionals: Draw Motion Envelope Enclosure
+            const chkShowPaths = document.getElementById('chkShowPaths').checked;
+            if (chkShowPaths) {
+                kCtx.strokeStyle = 'rgba(99, 102, 241, 0.12)';
+                kCtx.lineWidth = 1.5;
+                kCtx.setLineDash([4, 4]);
+
+                // Track of P1
+                kCtx.beginPath();
+                for (let a = -0.8; a <= 0.8; a += 0.05) {
+                    const testX = params.R1 * Math.cos(params.theta0 + a);
+                    const testY = params.R1 * Math.sin(params.theta0 + a);
+                    const pt = toCanvas(testX, testY);
+                    if (a === -0.8) kCtx.moveTo(pt.x, pt.y);
+                    else kCtx.lineTo(pt.x, pt.y);
+                }
+                kCtx.stroke();
+
+                // Track of P2
+                kCtx.beginPath();
+                for (let a = -0.8; a <= 0.8; a += 0.05) {
+                    const testX = params.R2 * Math.cos(params.theta0 + params.gamma + a);
+                    const testY = params.R2 * Math.sin(params.theta0 + params.gamma + a);
+                    const pt = toCanvas(testX, testY);
+                    if (a === -0.8) kCtx.moveTo(pt.x, pt.y);
+                    else kCtx.lineTo(pt.x, pt.y);
+                }
+                kCtx.stroke();
+                kCtx.setLineDash([]);
+            }
+
+            // Draw Bell Crank Body Structure
+            const p1Canvas = toCanvas(sol.p1.x, sol.p1.y);
+            const p2Canvas = toCanvas(sol.p2.x, sol.p2.y);
+
+            // Draw solid metallic body triangle (C - P1 - P2)
+            kCtx.fillStyle = 'rgba(99, 102, 241, 0.15)';
+            kCtx.strokeStyle = '#6366f1';
+            kCtx.lineWidth = 3;
+            kCtx.lineJoin = 'round';
+            kCtx.beginPath();
+            kCtx.moveTo(cCanvas.x, cCanvas.y);
+            kCtx.lineTo(p1Canvas.x, p1Canvas.y);
+            kCtx.lineTo(p2Canvas.x, p2Canvas.y);
+            kCtx.closePath();
+            kCtx.fill();
+            kCtx.stroke();
+
+            // Inner design arcs for aesthetic engineering look
+            kCtx.strokeStyle = 'rgba(99, 102, 241, 0.4)';
+            kCtx.lineWidth = 1;
+            kCtx.beginPath();
+            kCtx.arc(cCanvas.x, cCanvas.y, 15, 0, Math.PI * 2);
+            kCtx.stroke();
+
+            // Draw Linkages L1 and L2
+            if (sol.valid) {
+                const actCanvas = toCanvas(sol.x_in, params.y_in_line);
+                const sliCanvas = toCanvas(params.x_out_line, sol.y_out);
+
+                // Draw Linkage 1 (Actuator to P1)
+                kCtx.strokeStyle = '#10b981';
+                kCtx.lineWidth = 4;
+                kCtx.lineCap = 'round';
+                kCtx.beginPath();
+                kCtx.moveTo(actCanvas.x, actCanvas.y);
+                kCtx.lineTo(p1Canvas.x, p1Canvas.y);
+                kCtx.stroke();
+
+                // Draw Linkage 2 (P2 to Slider)
+                kCtx.strokeStyle = '#38bdf8';
+                kCtx.lineWidth = 4;
+                kCtx.beginPath();
+                kCtx.moveTo(p2Canvas.x, p2Canvas.y);
+                kCtx.lineTo(sliCanvas.x, sliCanvas.y);
+                kCtx.stroke();
+
+                // Draw Actuator Slider box
+                kCtx.fillStyle = '#059669';
+                kCtx.strokeStyle = '#10b981';
+                kCtx.lineWidth = 2;
+                kCtx.fillRect(actCanvas.x - 12, actCanvas.y - 8, 24, 16);
+                kCtx.strokeRect(actCanvas.x - 12, actCanvas.y - 8, 24, 16);
+
+                // Draw Slider box vertical
+                kCtx.fillStyle = '#0284c7';
+                kCtx.strokeStyle = '#38bdf8';
+                kCtx.lineWidth = 2;
+                kCtx.fillRect(sliCanvas.x - 8, sliCanvas.y - 12, 16, 24);
+                kCtx.strokeRect(sliCanvas.x - 8, sliCanvas.y - 12, 16, 24);
+
+                // Velocity Vectors (Highlighting instant tangencies)
+                const chkShowVectors = document.getElementById('chkShowVectors').checked;
+                if (chkShowVectors) {
+                    const ma = getMechanicalAdvantage(params.alpha);
+                    
+                    // Velocity vector arrow on Input Actuator
+                    kCtx.strokeStyle = '#f59e0b';
+                    kCtx.fillStyle = '#f59e0b';
+                    kCtx.lineWidth = 2;
+                    kCtx.beginPath();
+                    kCtx.moveTo(actCanvas.x, actCanvas.y);
+                    // Proportional arrow scale
+                    const arrowLenX = 35;
+                    kCtx.lineTo(actCanvas.x + arrowLenX, actCanvas.y);
+                    kCtx.stroke();
+                    drawArrowhead(kCtx, actCanvas.x + arrowLenX, actCanvas.y, 0);
+
+                    // Velocity vector arrow on Output Slider
+                    kCtx.strokeStyle = '#f59e0b';
+                    kCtx.fillStyle = '#f59e0b';
+                    kCtx.lineWidth = 2;
+                    kCtx.beginPath();
+                    kCtx.moveTo(sliCanvas.x, sliCanvas.y);
+                    const arrowLenY = 35 * ma; // Scaled by local dynamic mechanical gain
+                    kCtx.lineTo(sliCanvas.x, sliCanvas.y - arrowLenY); // Pointing up when pushed right
+                    kCtx.stroke();
+                    drawArrowhead(kCtx, sliCanvas.x, sliCanvas.y - arrowLenY, -Math.PI/2);
+                }
+            }
+
+            // Draw Pins / Joints
+            drawPin(cCanvas.x, cCanvas.y, '#f8fafc', '#475569', 6);
+            drawPin(p1Canvas.x, p1Canvas.y, '#10b981', '#065f46', 4.5);
+            drawPin(p2Canvas.x, p2Canvas.y, '#38bdf8', '#075985', 4.5);
+        }
+
+        function drawPin(x, y, fill, stroke, size) {
+            kCtx.fillStyle = fill;
+            kCtx.strokeStyle = stroke;
+            kCtx.lineWidth = 2;
+            kCtx.beginPath();
+            kCtx.arc(x, y, size, 0, Math.PI * 2);
+            kCtx.fill();
+            kCtx.stroke();
+        }
+
+        function drawArrowhead(ctx, x, y, angle) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+            ctx.beginPath();
+            ctx.moveTo(0, 0);
+            ctx.lineTo(-6, -3);
+            ctx.lineTo(-6, 3);
+            ctx.closePath();
+            ctx.fill();
+            ctx.restore();
+        }
+
+        // Draw Live I/O Curve (Transmission Graph)
+        function drawPlot(currentSol) {
+            const padLeft = 35;
+            const padRight = 15;
+            const padTop = 15;
+            const padBottom = 25;
+
+            const w = pCanvas.width;
+            const h = pCanvas.height;
+
+            const graphW = w - padLeft - padRight;
+            const graphH = h - padTop - padBottom;
+
+            // Generate datasets over the valid angular range [-0.8, 0.8]
+            const points = [];
+            let xMin = Infinity, xMax = -Infinity;
+            let yMin = Infinity, yMax = -Infinity;
+
+            for (let a = -0.81; a <= 0.81; a += 0.02) {
+                const testSol = solveMechanism(a);
+                if (testSol.valid) {
+                    points.push({ x: testSol.x_in, y: testSol.y_out });
+                    if (testSol.x_in < xMin) xMin = testSol.x_in;
+                    if (testSol.x_in > xMax) xMax = testSol.x_in;
+                    if (testSol.y_out < yMin) yMin = testSol.y_out;
+                    if (testSol.y_out > yMax) yMax = testSol.y_out;
+                }
+            }
+
+            // Ensure we have some safe margins if empty
+            if (points.length < 2) {
+                xMin = -7; xMax = -5;
+                yMin = -1; yMax = 1;
+            } else {
+                // Add margins to scaling
+                const xRange = xMax - xMin;
+                const yRange = yMax - yMin;
+                xMin -= xRange * 0.1;
+                xMax += xRange * 0.1;
+                yMin -= yRange * 0.1;
+                yMax += yRange * 0.1;
+            }
+
+            function toPlotCoords(x, y) {
+                const px = padLeft + ((x - xMin) / (xMax - xMin)) * graphW;
+                // Invert y so smaller math coordinates are at bottom
+                const py = padTop + (1 - (y - yMin) / (yMax - yMin)) * graphH;
+                return { x: px, y: py };
+            }
+
+            // Grid & Axes
+            pCtx.strokeStyle = '#1e293b';
+            pCtx.lineWidth = 1;
+            pCtx.beginPath();
+            // Draw horizontal dividers
+            for (let i = 0; i <= 4; i++) {
+                const ratio = i / 4;
+                const yVal = yMin + ratio * (yMax - yMin);
+                const pt = toPlotCoords(xMin, yVal);
+                pCtx.moveTo(padLeft, pt.y);
+                pCtx.lineTo(w - padRight, pt.y);
+                
+                // Value text labels
+                pCtx.fillStyle = '#64748b';
+                pCtx.font = '9px JetBrains Mono';
+                pCtx.fillText(yVal.toFixed(1), 5, pt.y + 3);
+            }
+            // Draw vertical dividers
+            for (let i = 0; i <= 4; i++) {
+                const ratio = i / 4;
+                const xVal = xMin + ratio * (xMax - xMin);
+                const pt = toPlotCoords(xVal, yMin);
+                pCtx.moveTo(pt.x, padTop);
+                pCtx.lineTo(pt.x, h - padBottom);
+                
+                pCtx.fillStyle = '#64748b';
+                pCtx.font = '9px JetBrains Mono';
+                pCtx.fillText(xVal.toFixed(1), pt.x - 8, h - 8);
+            }
+            pCtx.stroke();
+
+            // Label Axis Descriptions
+            pCtx.fillStyle = '#94a3b8';
+            pCtx.font = '10px Inter';
+            pCtx.fillText("Input Displacement X_in", padLeft + graphW/2 - 45, h - 1);
+
+            // Theoretical Perfect Linear Reference Line (Connecting endpoints)
+            if (points.length >= 2) {
+                pCtx.strokeStyle = 'rgba(56, 189, 248, 0.35)';
+                pCtx.lineWidth = 1.5;
+                pCtx.setLineDash([5, 4]);
+                pCtx.beginPath();
+                const pStart = toPlotCoords(points[0].x, points[0].y);
+                const pEnd = toPlotCoords(points[points.length-1].x, points[points.length-1].y);
+                pCtx.moveTo(pStart.x, pStart.y);
+                pCtx.lineTo(pEnd.x, pEnd.y);
+                pCtx.stroke();
+                pCtx.setLineDash([]);
+            }
+
+            // Transmission Curve Line
+            pCtx.strokeStyle = '#eab308';
+            pCtx.lineWidth = 2.5;
+            pCtx.beginPath();
+            for (let i = 0; i < points.length; i++) {
+                const pt = toPlotCoords(points[i].x, points[i].y);
+                if (i === 0) pCtx.moveTo(pt.x, pt.y);
+                else pCtx.lineTo(pt.x, pt.y);
+            }
+            pCtx.stroke();
+
+            // Highlight Active Cursor Point
+            if (currentSol.valid) {
+                const currentPt = toPlotCoords(currentSol.x_in, currentSol.y_out);
+                
+                // Pulse halo
+                pCtx.fillStyle = 'rgba(234, 179, 8, 0.2)';
+                pCtx.beginPath();
+                pCtx.arc(currentPt.x, currentPt.y, 8, 0, Math.PI * 2);
+                pCtx.fill();
+
+                // Core indicator
+                pCtx.fillStyle = '#f59e0b';
+                pCtx.strokeStyle = '#fff';
+                pCtx.lineWidth = 1.5;
+                pCtx.beginPath();
+                pCtx.arc(currentPt.x, currentPt.y, 4.5, 0, Math.PI * 2);
+                pCtx.fill();
+                pCtx.stroke();
+            }
+        }
+
+        // Loop Runner
+        function loop() {
+            if (isPlaying) {
+                animationTime += 0.02;
+                // Harmonic sweep sweep range (-0.5 to 0.5 rad)
+                params.alpha = 0.5 * Math.sin(animationTime);
+                syncUI();
+            }
+            update();
+            requestAnimationFrame(loop);
+        }
+
+        // Setup on Load
+        window.onload = function() {
+            resize();
+            loadPreset('standard');
+            loop();
+        };
+    </script>
+</body>
+</html>
